@@ -18,7 +18,7 @@ int EExterno(Arvore p){	//	Verifica se p^ e nodo externo
 	return (p->nt == Externo);
 }
 
-Arvore CriaNoInt(int i, Arvore *Esq,  Arvore *Dir){
+Arvore CriaNoInt(Arvore *Esq,  Arvore *Dir, int i){
 	Arvore p;
 	p = (Arvore)malloc(sizeof(PatNo));
 	p->nt = Interno;
@@ -36,7 +36,7 @@ Arvore CriaNoExt(int k){
 	return p;
 }
 
-void Pesquisa(int k, Arvore t, int D){
+void Pesquisa(Arvore t, int k, int D){
 	if (EExterno(t)){
 		if (k == t->NO.Chave)
 			printf("Elemento encontrado\n");
@@ -45,30 +45,30 @@ void Pesquisa(int k, Arvore t, int D){
 		return;
 	}
 	if (Bit(t->NO.NInterno.Index, k, D) == 0)
-		Pesquisa(k, t->NO.NInterno.Esq, D);
+		Pesquisa(t->NO.NInterno.Esq, k, D);
 	else
-		Pesquisa(k, t->NO.NInterno.Dir, D);
+		Pesquisa(t->NO.NInterno.Dir, k, D);
 }
 
-Arvore InsereEntre(int k, Arvore *t, int i, int D){
+Arvore InsereEntre(Arvore *t, int k, int i, int D){
 	Arvore p;
 	if (EExterno(*t) || i < (*t)->NO.NInterno.Index) {	//	cria um novo no externo
 		p = CriaNoExt(k);
 		if (Bit(i, k, D) == 1)
-			return (CriaNoInt(i, t, &p));
+			return (CriaNoInt(t, &p, i));
 		else
-			return (CriaNoInt(i, &p, t));
+			return (CriaNoInt(&p, t, i));
 	}
 	else{
 		if (Bit((*t)->NO.NInterno.Index, k, D) == 1)
-			(*t)->NO.NInterno.Dir = InsereEntre(k, &(*t)->NO.NInterno.Dir, i, D);
+			(*t)->NO.NInterno.Dir = InsereEntre(&(*t)->NO.NInterno.Dir, k, i, D);
 		else
-			(*t)->NO.NInterno.Esq = InsereEntre(k, &(*t)->NO.NInterno.Esq, i, D);
+			(*t)->NO.NInterno.Esq = InsereEntre(&(*t)->NO.NInterno.Esq, k, i, D);
 		return (*t);
 	}
 }
 
-Arvore Insere(int k, Arvore *t, int D){
+Arvore Insere(Arvore *t, int k, int D){
 	Arvore p;
 	int i;
 	if (!(*t))
@@ -90,6 +90,6 @@ Arvore Insere(int k, Arvore *t, int D){
 			return (*t);
 		}
 		else
-			return (InsereEntre(k, t, i, D));
+			return (InsereEntre(t, k, i, D));
     }
 }
