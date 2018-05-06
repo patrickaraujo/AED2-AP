@@ -17,8 +17,11 @@ int main(int argc, char *argv[]){
 	int  vetor[95];
 	//	Gera uma permutacao aleatoria de chaves dos caracteres ASCII 32 a  126
 	struct timeval semente;
+	
 	gettimeofday(&semente,NULL);
+	
 	srand((int)(semente.tv_sec + 1000000*semente.tv_usec));
+	
 	for (i = min; i <= max; i++)
 		vetor[i-32] = i;
 	for (i = min; i <= max; i++) {
@@ -32,7 +35,7 @@ int main(int argc, char *argv[]){
 	for (i = min; i <= max; i++) {
 		c = vetor[i-32];
 		printf("Inserindo chave: %c\n", c);
-		a = Insere(c, &a, D);
+		a = Insere(&a, c, D);
     }
 	//	Gera outra permutacao aleatoria de chaves
 	for (i = min; i <= max; i++) {
@@ -46,7 +49,7 @@ int main(int argc, char *argv[]){
 	for (i = min; i <= max; i++) {
 		c = vetor[i-32];
 		printf("Pesquisando chave: %c\n", c);
-		Pesquisa(c, a, D);
+		Pesquisa(a, c, D);
 	}
 	return 0;
 }
