@@ -18,12 +18,12 @@ typedef struct PatNo {
 	}NO;
 }PatNo;
 
-int Bit(int i, int k, int D);
-int EExterno(Arvore p);
-Arvore CriaNoInt(int i, Arvore *Esq,  Arvore *Dir);
-Arvore CriaNoExt(int k);
-void Pesquisa(int k, Arvore t, int D);
-Arvore InsereEntre(int k, Arvore *t, int i, int D);
-Arvore Insere(int k, Arvore *t, int D);
+int Bit(int, int, int);
+int EExterno(Arvore);
+Arvore CriaNoInt(Arvore*,  Arvore*, int);
+Arvore CriaNoExt(int);
+void Pesquisa(Arvore, int, int);
+Arvore InsereEntre(Arvore*, int, int, int);
+Arvore Insere(Arvore*, int, int);
 
 #endif // TAP_H_INCLUDED
