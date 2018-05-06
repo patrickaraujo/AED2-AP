@@ -79,7 +79,7 @@ TAP Insere(TAP *main, int k, int D){
 			else
 				p = p->NO.NInterno.Esq;
 		}
-		//	acha o primeiro bit diferente */
+		//	acha o primeiro bit diferente
 		i = 1;
 		while ((i <= D) & (Bit((int)i, k, D) == Bit((int)i, p->NO.Chave, D)))
 			i++;
