@@ -14,13 +14,12 @@ int Bit(int i, int k, int D){	//	Retorna o i-esimo bit da chave k a partir da es
 	}
 }
 
-int EExterno(Arvore p){	//	Verifica se p^ e nodo externo
+int EExterno(TAP p){	//	Verifica se p^ e nodo externo
 	return (p->nt == Externo);
 }
 
-Arvore CriaNoInt(Arvore *Esq,  Arvore *Dir, int i){
-	Arvore p;
-	p = (Arvore)malloc(sizeof(PatNo));
+TAP CriaNoInt(TAP *Esq,  TAP *Dir, int i){
+	TAP p = (TAP)malloc(sizeof(AP));
 	p->nt = Interno;
 	p->NO.NInterno.Esq = *Esq;
 	p->NO.NInterno.Dir = *Dir;
@@ -28,53 +27,52 @@ Arvore CriaNoInt(Arvore *Esq,  Arvore *Dir, int i){
 	return p;
 }
 
-Arvore CriaNoExt(int k){
-	Arvore p;
-	p = (Arvore)malloc(sizeof(PatNo));
+TAP CriaNoExt(int k){
+	TAP p = (TAP)malloc(sizeof(AP));
 	p->nt = Externo;
 	p->NO.Chave = k;
 	return p;
 }
 
-void Pesquisa(Arvore t, int k, int D){
-	if (EExterno(t)){
-		if (k == t->NO.Chave)
+void Pesquisa(TAP main, int k, int D){
+	if (EExterno(main)){
+		if (k == main->NO.Chave)
 			printf("Elemento encontrado\n");
 		else
 			printf("Elemento nao encontrado\n");
 		return;
 	}
-	if (Bit(t->NO.NInterno.Index, k, D) == 0)
-		Pesquisa(t->NO.NInterno.Esq, k, D);
+	if (Bit(main->NO.NInterno.Index, k, D) == 0)
+		Pesquisa(main->NO.NInterno.Esq, k, D);
 	else
-		Pesquisa(t->NO.NInterno.Dir, k, D);
+		Pesquisa(main->NO.NInterno.Dir, k, D);
 }
 
-Arvore InsereEntre(Arvore *t, int k, int i, int D){
-	Arvore p;
-	if (EExterno(*t) || i < (*t)->NO.NInterno.Index) {	//	cria um novo no externo
+TAP InsereEntre(TAP *main, int k, int i, int D){
+	TAP p;
+	if (EExterno(*main) || i < (*main)->NO.NInterno.Index) {	//	cria um novo no externo
 		p = CriaNoExt(k);
 		if (Bit(i, k, D) == 1)
-			return (CriaNoInt(t, &p, i));
+			return (CriaNoInt(main, &p, i));
 		else
-			return (CriaNoInt(&p, t, i));
+			return (CriaNoInt(&p, main, i));
 	}
 	else{
-		if (Bit((*t)->NO.NInterno.Index, k, D) == 1)
-			(*t)->NO.NInterno.Dir = InsereEntre(&(*t)->NO.NInterno.Dir, k, i, D);
+		if (Bit((*main)->NO.NInterno.Index, k, D) == 1)
+			(*main)->NO.NInterno.Dir = InsereEntre(&(*main)->NO.NInterno.Dir, k, i, D);
 		else
-			(*t)->NO.NInterno.Esq = InsereEntre(&(*t)->NO.NInterno.Esq, k, i, D);
-		return (*t);
+			(*main)->NO.NInterno.Esq = InsereEntre(&(*main)->NO.NInterno.Esq, k, i, D);
+		return (*main);
 	}
 }
 
-Arvore Insere(Arvore *t, int k, int D){
-	Arvore p;
+TAP Insere(TAP *main, int k, int D){
+	TAP p;
 	int i;
-	if (!(*t))
+	if (!(*main))
 		return (CriaNoExt(k));
 	else {
-		p = *t;
+		p = *main;
 		while (!EExterno(p)) {
 			if (Bit(p->NO.NInterno.Index, k, D) == 1)
 				p = p->NO.NInterno.Dir;
@@ -87,9 +85,9 @@ Arvore Insere(Arvore *t, int k, int D){
 			i++;
 		if (i > D) {
 			printf("Erro: chave ja esta na arvore\n");
-			return (*t);
+			return (*main);
 		}
 		else
-			return (InsereEntre(t, k, i, D));
+			return (InsereEntre(main, k, i, D));
     }
 }
