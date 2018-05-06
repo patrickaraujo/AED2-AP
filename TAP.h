@@ -5,25 +5,25 @@ typedef enum {
 	Interno, Externo
 }NoTipo;
 
-typedef struct PatNo* Arvore;
+typedef struct AP* TAP;
 
-typedef struct PatNo {
+typedef struct AP {
 	NoTipo nt;
 	union {
 		struct {
 			int Index;
-			Arvore Esq, Dir;
+			TAP Esq, Dir;
 		}NInterno;
 		int Chave;
 	}NO;
-}PatNo;
+}AP;
 
 int Bit(int, int, int);
-int EExterno(Arvore);
-Arvore CriaNoInt(Arvore*,  Arvore*, int);
-Arvore CriaNoExt(int);
-void Pesquisa(Arvore, int, int);
-Arvore InsereEntre(Arvore*, int, int, int);
-Arvore Insere(Arvore*, int, int);
+int EExterno(TAP);
+TAP CriaNoInt(TAP*,  TAP*, int);
+TAP CriaNoExt(int);
+void Pesquisa(TAP, int, int);
+TAP InsereEntre(TAP*, int, int, int);
+TAP Insere(TAP*, int, int);
 
 #endif // TAP_H_INCLUDED
