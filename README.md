@@ -10,7 +10,7 @@ Algoritmos e Estrutura de Dados 2 - [Fundação Universidade Federal do Tocantin
 _Functions_:
 * _Insertion_
 * _Search_
-*_Deletion_
-*_In-order Traversal_
+* _Deletion_
+* _In-order Traversal_
 
 _Data Structures and Algorithms 2 - [Federal University of Tocantins (UFT)](http://ww2.uft.edu.br "UFT's main page") - [Computer Science](https://palmas.uft.edu.br/grad/ccomp/ "Main page of the UFT's Computer Science site")_
