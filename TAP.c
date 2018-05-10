@@ -2,92 +2,162 @@
 #include <stdlib.h>
 #include "TAP.h"
 
-int Bit(int i, int k, int D){	//	Retorna o i-esimo bit da chave k a partir da esquerda
-	int  c, j;
-	if (!i)
-		return NULL;
-	else {
-		c = k;
-		for (j = 1; j <= D - i; j++)
-		c /= 2;
-		return (c & 1);
-	}
+int pegaBit(char info, int pos){
+	return (info >> 7-pos) & 1;
 }
 
-int EExterno(TAP p){	//	Verifica se p^ e nodo externo
-	return (p->nt == Externo);
-}
+TAP* insere(TAP *main, char info, int numMaxBits) {
+	TAP *novo, *novoFilho, *retorno;
+	int posBit;
 
-TAP CriaNoInt(TAP *Esq,  TAP *Dir, int i){
-	TAP p = (TAP)malloc(sizeof(AP));
-	p->nt = Interno;
-	p->NO.NInterno.Esq = *Esq;
-	p->NO.NInterno.Dir = *Dir;
-	p->NO.NInterno.Index = i;
-	return p;
-}
-
-TAP CriaNoExt(int k){
-	TAP p = (TAP)malloc(sizeof(AP));
-	p->nt = Externo;
-	p->NO.Chave = k;
-	return p;
-}
-
-void Pesquisa(TAP main, int k, int D){
-	if (EExterno(main)){
-		if (k == main->NO.Chave)
-			printf("Elemento encontrado\n");
-		else
-			printf("Elemento nao encontrado\n");
-		return;
-	}
-	if (Bit(main->NO.NInterno.Index, k, D) == 0)
-		Pesquisa(main->NO.NInterno.Esq, k, D);
-	else
-		Pesquisa(main->NO.NInterno.Dir, k, D);
-}
-
-TAP InsereEntre(TAP *main, int k, int i, int D){
-	TAP p;
-	if (EExterno(*main) || i < (*main)->NO.NInterno.Index) {	//	cria um novo no externo
-		p = CriaNoExt(k);
-		if (Bit(i, k, D) == 1)
-			return (CriaNoInt(main, &p, i));
-		else
-			return (CriaNoInt(&p, main, i));
+	if (!main) {
+		novo = malloc(sizeof(TAP));
+		novo->info = info;
+		novo->bit = -1;
+		novo->esq = NULL; novo->dir = NULL;
+		retorno = novo;
 	}
 	else{
-		if (Bit((*main)->NO.NInterno.Index, k, D) == 1)
-			(*main)->NO.NInterno.Dir = InsereEntre(&(*main)->NO.NInterno.Dir, k, i, D);
-		else
-			(*main)->NO.NInterno.Esq = InsereEntre(&(*main)->NO.NInterno.Esq, k, i, D);
-		return (*main);
+		if (main->bit == -1){
+			//	printf("%d\n", main->bit);
+			posBit = 0;
+			while ((posBit < numMaxBits) && (pegaBit(main->info, posBit) == pegaBit(info, posBit)))
+				posBit++;
+			if (posBit < numMaxBits) {
+				//	printf("Posicao do bit = %d\n", posBit);
+				novoFilho = malloc(sizeof(TAP));
+				novoFilho->info = info;
+				novoFilho->bit = -1;
+				novoFilho->esq = NULL; novoFilho->dir = NULL;
+				novo = malloc(sizeof(TAP));
+				novo->info = info;
+				novo->bit = posBit;
+				if (!pegaBit(info,posBit)) {
+					novo->esq = novoFilho;
+					novo->dir = NULL;
+				}
+				else{
+					novo->dir = novoFilho;
+					novo->esq = NULL;
+				}
+				retorno = novo;
+			}
+			else
+				retorno = NULL;
+		}
+		else{
+			if (!pegaBit(info, main->bit)){
+				// printf("vai inserir a esquerda do %d\n", main->bit);
+				novo = insere(main->esq, info, numMaxBits);
+				// printf("%d\n", novo->bit);
+				if (novo) {
+					if (novo->bit < main->bit)
+						retorno = novo;
+					else{
+						if (!novo->esq)
+							novo->esq = main->esq;
+						else
+							novo->dir = main->esq;
+						main->esq = novo;
+						retorno = NULL;
+					}
+				}
+				else{
+					retorno = main;
+				}
+			}else{
+				// printf("vai inserir a direita do %d\n", main->bit);
+				novo = insere(main->dir, info, numMaxBits);
+				if (novo){
+					if (novo->bit < main->bit)
+						retorno = novo;
+					else{
+						if (!novo->esq)
+							novo->esq = main->dir;
+						else
+							novo->dir = main->dir;
+						main->dir = novo;
+						retorno = NULL;
+					}
+				}
+				else
+					retorno = main;
+			}
+		}
+	}
+	return retorno;
+}
+
+TAP* inserePatricia(TAP *main, char info, int numMaxBits) {
+	TAP *retorno, *novo = insere(main, info, numMaxBits);
+	if (!novo)
+		retorno = main;
+	else {
+		// printf("Novo retornou para a raiz com bit = %d\n", novo->bit);
+		if (novo->bit != -1)
+			if (!novo->esq) {
+				//	printf("direita -> %d    %c\n", novo->bit, novo->dir->info);
+				novo->esq = main;
+			}
+			else
+				novo->dir = main;	//	printf("esquerda -> %d    %c\n", novo->bit, novo->esq->info);
+			retorno = novo;
+	}
+	return retorno;
+}
+
+TAP* removePatricia(TAP *main, char info) {
+	TAP *retorno;
+
+	if (!main){
+		retorno = NULL;
+	}
+	else{
+		if (main->bit == -1){
+			if (main->info == info){
+				free(main);
+				retorno = NULL;
+			}
+			else
+				retorno = main;
+		}
+		else{
+			if (!pegaBit(info, main->bit)){
+				main->esq = removePatricia(main->esq, info);
+				if (!main->esq){
+					retorno = main->dir;
+					free(main);
+				}
+				else
+					retorno = main;
+			}
+			else{
+				main->dir = removePatricia(main->dir, info);
+				if (!main->dir){
+					retorno = main->esq;
+					free(main);
+				}
+				else
+					retorno = main;
+			}
+		}
+	}
+	return retorno;
+}
+
+void caminhaEmOrdem(TAP *main) {
+	if (main) {
+		caminhaEmOrdem(main->esq);
+		if ((!main->esq) && (!main->dir))
+			printf("%c\n", main->info);
+		caminhaEmOrdem(main->dir);
 	}
 }
 
-TAP Insere(TAP *main, int k, int D){
-	TAP p;
+void imprimeLetraBin(char letra, int numMaxBits) {
 	int i;
-	if (!(*main))
-		return (CriaNoExt(k));
-	else {
-		p = *main;
-		while (!EExterno(p)) {
-			if (Bit(p->NO.NInterno.Index, k, D) == 1)
-				p = p->NO.NInterno.Dir;
-			else
-				p = p->NO.NInterno.Esq;
-		}
-		//	acha o primeiro bit diferente
-		i = 1;
-		while ((i <= D) & (Bit((int)i, k, D) == Bit((int)i, p->NO.Chave, D)))
-			i++;
-		if (i > D) {
-			printf("Erro: chave ja esta na arvore\n");
-			return (*main);
-		}
-		else
-			return (InsereEntre(main, k, i, D));
-    }
+	printf("%c = ", letra);
+	for(i = 0; i < numMaxBits; i++)
+		printf("%d", pegaBit(letra,i));
+	printf("\n");
 }
