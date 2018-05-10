@@ -4,14 +4,14 @@
 typedef struct AP{
 	int bit;
 	char info;
-	struct AP *esq;
-	struct AP *dir;
+	struct AP* esq;
+	struct AP* dir;
 } TAP;
 
 int pegaBit(char, int);
-TAP *insere(TAP*, char, int);
-TAP *inserePatricia(TAP*, char, int);
-TAP *removePatricia(TAP*, char);
+TAP* insere(TAP*, char, int);
+TAP* inserePatricia(TAP*, char, int);
+TAP* removePatricia(TAP*, char);
 void caminhaEmOrdem(TAP*);
 void imprimeLetraBin(char, int);
 
