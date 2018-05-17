@@ -161,4 +161,3 @@ void imprimeLetraBin(char letra, int numMaxBits) {
 		printf("%d", pegaBit(letra,i));
 	printf("\n");
 }
-//bingo
