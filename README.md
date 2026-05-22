@@ -1,431 +1,398 @@
-# Árvore B em C — Guia do Código
+# Árvore Patrícia em C — Guia do Código
 
-Implementação acadêmica de uma **Árvore B** em C, com operações de
-inserção, remoção e busca. Esta documentação acompanha a versão
-revisada do código original do projeto `AED2-ArvoreB` (UFT, Ciência da
-Computação).
-
----
-
-## 1. O que é uma Árvore B
-
-Uma **Árvore B de ordem _t_** é uma árvore balanceada na qual cada nó
-(chamado aqui de **página**) pode conter várias chaves e vários
-filhos. Diferente da Árvore Binária de Busca, a Árvore B não cresce
-em profundidade a cada nova chave — ela cresce em **largura**, e só
-aumenta de altura quando absolutamente necessário.
-
-**Propriedades fundamentais:**
-
-| Propriedade                              | Garantia                                |
-| ---------------------------------------- | --------------------------------------- |
-| Chaves por página (não-raiz)             | entre **_t_** e **2_t_**                |
-| Chaves na raiz                           | entre **1** e **2_t_** (se não vazia)   |
-| Filhos por página interna                | _n_chaves_ + 1                          |
-| Altura de todas as folhas                | **igual** (árvore perfeitamente balanceada) |
-| Chaves dentro da página                  | em ordem **crescente**                  |
-| Subárvore `filhos[i]`                    | contém chaves entre `chaves[i-1]` e `chaves[i]` |
-
-No código deste projeto, o parâmetro `ordem` é exatamente o _t_ acima.
-O `main.c` usa `ordem = 2`, então cada página comporta de 2 a 4
-chaves (e a raiz pode ter de 1 a 4).
-
-> **Por que isso importa?** Árvores B foram desenhadas para minimizar
-> acessos a disco — cada página é projetada para caber em um bloco do
-> sistema de arquivos. Por isso são a base de **índices de bancos de
-> dados** (MySQL InnoDB usa B+Tree, por exemplo) e sistemas de
-> arquivos modernos. Este projeto é a versão didática em memória.
+Implementação acadêmica da **Árvore Patrícia** em C, variante clássica
+de Sedgewick (cap. 17 de *Algorithms in C*), com nó-cabeça sentinela
+e back-edges. Esta documentação acompanha a versão revisada do código.
 
 ---
 
-## 2. Estrutura de dados
+## 1. O que é uma Árvore Patrícia
 
-A página é representada pelo `struct AB`, com `typedef` para `TAB`:
+**PATRICIA** = *Practical Algorithm To Retrieve Information Coded In
+Alphanumeric*. Foi proposta por Morrison em 1968 e popularizada por
+Sedgewick. É uma variante comprimida da **trie binária** que indexa
+chaves comparando-as **bit a bit**.
+
+A ideia central: em vez de comparar a chave inteira em cada nó (como
+faz uma ABB), comparamos **um único bit** por nó. Cada nó interno
+guarda o **índice** do bit a ser testado — e direciona para o filho
+esquerdo (se o bit for 0) ou direito (se for 1).
+
+Vantagens da Patrícia frente à ABB:
+
+- **Não degenera** com chaves em ordem — a altura é limitada pelo
+  número de bits da chave, não pelo número de chaves.
+- **Comparações são apenas de bit único** — caminhamento muito rápido.
+- **Suporta operações eficientes** de busca por prefixo (sem precisar
+  de strings, naturalmente, com bits).
+
+Aplicações reais: tabelas de roteamento IP em kernels Linux e BSD,
+índices em bancos de dados orientados a bytes, motores de busca por
+prefixo de DNA.
+
+---
+
+## 2. Variante implementada: Patrícia clássica
+
+Esta é a variante **clássica de Sedgewick**, com duas características
+distintivas:
+
+### 2.1 Nó-cabeça sentinela
+
+A árvore não começa em um nó comum. Existe um **nó-cabeça permanente**
+com `bit=-1` e `item=ITEMNULO`, cujo `esq` aponta para a raiz "real"
+(ou para si mesmo, se a árvore estiver vazia).
+
+```
+                ┌──────────────────────┐
+                │   nó-cabeça (bit=-1) │
+                │   item = ITEMNULO    │
+                └──────────────────────┘
+                       │
+                       ▼ esq aponta para...
+                ┌──────────────────────┐
+                │   raiz "real"        │
+                │   (ou ele mesmo se   │
+                │    a árvore vazia)   │
+                └──────────────────────┘
+```
+
+**Por que sentinela?** Simplifica MUITO os casos de borda:
+
+- A árvore vazia é apenas o nó-cabeça apontando para si mesmo
+  (`raiz->esq == raiz`).
+- A inserção do primeiro elemento não precisa de tratamento especial.
+- Em todas as funções recursivas, basta verificar "voltei ao
+  sentinela?" para detectar fim de caminho.
+
+### 2.2 Back-edges (links de retorno)
+
+Diferente da variante "híbrida" comum (onde folhas são nós separados),
+a Patrícia clássica usa **um único tipo de nó** para tudo. Quando um
+ponteiro "desceria" para uma folha, ele aponta de volta para um nó já
+existente da árvore — esse ponteiro é uma **back-edge**.
+
+**Como identificar uma back-edge?** Pela regra:
+
+```
+bit do nó pai (durante descida)  <  bit do nó filho   →  aresta normal
+bit do nó pai                    ≥  bit do nó filho   →  BACK-EDGE
+```
+
+Como o bit cresce monotonicamente durante uma descida normal, qualquer
+filho com bit menor ou igual é necessariamente uma back-edge. Quem
+chega a esse nó pelo "caminho de back-edge" lê a `chave` armazenada
+nele como se fosse uma folha lógica.
+
+```
+        ┌─[S | 10011 | bit=0]─┐         ← nó interno (raiz real)
+        0│                    │1
+         ▼                    ▼
+   [H | 01000 | bit=1]  [R | 10010 | bit=4]
+       0│       1│         0│        1│
+        ▼        ▼          ▼         ▼
+       ...     ...    ← R (back-edge   ← S (back-edge
+                         para o R)        para a raiz!)
+```
+
+Repare na linha de baixo: o lado direito de `R` aponta de volta
+para o `S` (raiz), que é a back-edge contendo a chave `S` como folha
+lógica.
+
+---
+
+## 3. Estrutura de dados
 
 ```c
-typedef struct AB {
-    int           n_chaves;   // quantas chaves a página tem agora
-    int          *chaves;     // vetor com capacidade 2t
-    struct AB   **filhos;     // vetor com capacidade 2t+1
-} TAB;
+typedef struct Nodo {
+    TipoItem item;   // chave (ITEMNULO no sentinela)
+    ApNodo   esq;    // filho esquerdo — bit = 0
+    ApNodo   dir;    // filho direito — bit = 1
+    int      bit;    // bit testado (-1 só no sentinela)
+} Nodo;
 ```
 
-Os vetores são **alocados dinamicamente** em `novaPagina(ordem)`, o
-que permite parametrizar a ordem em tempo de execução. Para uma
-página com `n_chaves = k`, são significativos:
+O **mesmo struct** serve para nó-cabeça, nós internos e (logicamente)
+folhas. O papel é determinado pelo contexto: o nó alvo de uma
+back-edge funciona como folha; o nó atravessado normalmente funciona
+como interno.
 
-- `chaves[0..k-1]`
-- `filhos[0..k]`
+### Convenção de bits
 
-Visualmente (para `t=2`, com `k=3` chaves):
-
-```
-            +-----+-----+-----+-----+
-   chaves:  |  2  |  5  |  9  |  -  |
-            +-----+-----+-----+-----+
-            /     |     |     \
-   filhos[0] f[1] f[2]   f[3]   (f[4] = NULL)
-```
-
-A subárvore `filhos[1]` contém apenas chaves no intervalo `(2, 5)`,
-`filhos[2]` contém `(5, 9)`, e assim por diante.
+- `PATRICIA_BITS` define a largura da chave em bits (configurável).
+- **Posição 0 = MSB** dentro dos `PATRICIA_BITS` bits.
+- Para `PATRICIA_BITS=5` e chave `9` (binário `01001`):
+  - posição 0 vale 0
+  - posição 4 vale 1
 
 ---
 
-## 3. Como compilar e rodar
+## 4. Como compilar e rodar
 
 ```bash
-make            # gera o executável ./arvoreb
+make            # default: 5 bits (suficiente para A..Z = 1..26)
 make run        # compila e executa
-make debug      # build com símbolos para gdb
-make clean      # limpa artefatos
+make bits8      # PATRICIA_BITS=8 (chaves de um byte)
+make bits32     # PATRICIA_BITS=32 (chaves de int)
+make debug      # build com -g -O0 para gdb
+make sanitize   # build com AddressSanitizer + UBSanitizer
+make clean
 ```
 
 Ou manualmente:
 
 ```bash
-gcc -Wall -Wextra -std=c11 -o arvoreb main.c TAB.c
-./arvoreb
+gcc -DPATRICIA_BITS=8 -Wall -Wextra -std=c11 -o patricia main.c patricia.c
 ```
-
-**Importante:** compile `main.c` **e** `TAB.c` juntos. Diferente da
-versão original, o `main.c` não faz `#include "TAB.c"` (esse era um
-anti-padrão que mistura compilação com inclusão de código).
 
 ---
 
-## 4. Arquitetura dos arquivos
+## 5. Impressão hierárquica
+
+A impressão usa estilo `tree(1)` com prefixos acumulados. Para a
+sequência clássica de aula `A, S, E, R, C, H, I, N` (com 5 bits):
 
 ```
-arvoreb-v2/
-├── TAB.h        # interface pública (struct + assinaturas + docstrings Doxygen)
-├── TAB.c        # implementação das operações
-├── main.c       # programa de demonstração
-├── Makefile     # automação de build
-└── README.md    # este documento
+`-- raiz.esq [S | 10011 | bit=0]
+    |-- 0 [H | 01000 | bit=1]
+    |   |-- 0 [E | 00101 | bit=2]
+    |   |   |-- 0 [C | 00011 | bit=3]
+    |   |   |   |-- 0 [A | 00001 | bit=4]
+    |   |   |   |   |-- 0 -> SENTINELA/NULL
+    |   |   |   |   `-- 1 -> folha [A | 00001 | bit=4]
+    |   |   |   `-- 1 -> folha [C | 00011 | bit=3]
+    |   |   `-- 1 -> folha [E | 00101 | bit=2]
+    |   `-- 1 [N | 01110 | bit=2]
+    |       |-- 0 [I | 01001 | bit=4]
+    |       |   |-- 0 -> folha [H | 01000 | bit=1]
+    |       |   `-- 1 -> folha [I | 01001 | bit=4]
+    |       `-- 1 -> folha [N | 01110 | bit=2]
+    `-- 1 [R | 10010 | bit=4]
+        |-- 0 -> folha [R | 10010 | bit=4]
+        `-- 1 -> folha [S | 10011 | bit=0]
 ```
 
-O cabeçalho `TAB.h` declara três grupos de funções:
+**Como ler:**
 
-1. **Construção/destruição:** `novaPagina`, `liberarArvore`.
-2. **Operações públicas:** `insercao`, `remocao`, `busca`, `imprimir`.
-3. **Auxiliares (expostas para fins didáticos):** `inserePagina`,
-   `efetuaInsercao`, `efetuaRemocao`, `antecessor`, `reconstitui`.
+- `[X | bits | bit=k]` é um **nó interno** que testa o bit `k`.
+- `-> folha [...]` indica uma **back-edge** (folha lógica).
+- `-> SENTINELA/NULL` indica retorno ao nó-cabeça (típico em árvores
+  com poucas chaves do lado em questão).
+- As arestas são rotuladas com `0` ou `1` para mostrar qual valor do
+  bit conduz por cada caminho.
 
-Em uma versão "de produção" o terceiro grupo seria marcado `static`
-dentro do `.c` e omitido do `.h`. Mantemos públicas para que os
-alunos possam testar e instrumentar cada peça individualmente.
+**Verifique visualmente:** para qualquer folha, siga o caminho desde a
+raiz comparando o bit indicado em cada nó interno com o binário da
+chave. Por exemplo, chegar à folha `[A | 00001 | bit=4]`:
+- raiz testa bit 0 → A tem bit 0 = 0 → desce esq
+- nó H testa bit 1 → A tem bit 1 = 0 → desce esq
+- nó E testa bit 2 → A tem bit 2 = 0 → desce esq
+- nó C testa bit 3 → A tem bit 3 = 0 → desce esq
+- nó A testa bit 4 → A tem bit 4 = 1 → desce dir (back-edge para A)
+
+A invariante crucial: **o bit cresce ao descer pelo caminho normal**.
+Quebra disso = back-edge.
 
 ---
 
-## 5. Inserção
+## 6. Operações
 
-### 5.1 Visão geral do algoritmo
-
-A inserção em uma Árvore B segue o princípio **"desce, insere na
-folha, sobe corrigindo overflow"**:
-
-1. Descer recursivamente até a folha onde a chave deveria ficar
-   (`efetuaInsercao`).
-2. Inserir a chave na folha.
-3. **Se a folha estourar** (passar de 2_t_ chaves), **cindi-la em
-   duas** e promover a chave do meio para o pai.
-4. Se o pai também estourar, propagar a cisão para cima.
-5. Se a **raiz** estourar, criar uma nova raiz com a chave promovida —
-   é assim que a árvore **cresce em altura**.
-
-### 5.2 Fluxo das funções
+### 6.1 Busca — `busca(v, raiz)`
 
 ```
-insercao()
-    │
-    └──► efetuaInsercao()           ← recursão; desce até a folha
-            │
-            ├──► inserePagina()     ← caso simples: cabe na página
-            │
-            └──► (se overflow)
-                  ├── novaPagina()  ← cria a página direita
-                  └── inserePagina(várias vezes)
-                                    ← redistribui as chaves
+1. Comece em raiz->esq, com bitAnterior = -1.
+2. Em cada nó p, se p->bit <= bitAnterior, isso é uma folha lógica:
+   compare p->item com v e devolva o resultado.
+3. Senão, examine o bit de v na posição p->bit:
+   - se for 0, desça pela esquerda
+   - se for 1, desça pela direita
+4. Atualize bitAnterior = p->bit e volte ao passo 2.
 ```
 
-### 5.3 Exemplo passo a passo (ordem _t_ = 2)
+Complexidade: O(b), onde b = `PATRICIA_BITS`.
 
-Inserindo `3, 2, 4, 5, 6`:
+### 6.2 Inserção — `insere(v, raiz)`
 
 ```
-após 3:      [3]
-
-após 2:      [2, 3]
-
-após 4:      [2, 3, 4]
-
-após 5:      [2, 3, 4, 5]    ← página cheia (2t = 4)
-
-após 6:      tentaria [2,3,4,5,6] → CISÃO
-             promove o meio (4), cria 2 páginas:
-
-                       [4]
-                      /   \
-                  [2,3]   [5,6]
+1. Busque v (passo 1 da busca acima) — chegue na folha lógica p.
+2. Se p->item == v, é duplicata: rejeite.
+3. Calcule bitDiferente = primeiro bit em que v e p->item diferem.
+4. Desça novamente pela árvore. Insira o novo nó no nível onde:
+   - o nó atual tem bit > bitDiferente (passou do lugar), ou
+   - chegamos a uma back-edge.
+5. O novo nó tem bit = bitDiferente, um filho aponta para v
+   (back-edge para a nova chave) e o outro para a subárvore atual.
 ```
 
-A árvore cresce em altura. Observe que a única forma de a árvore
-ficar mais alta é exatamente quando a **raiz cinde** — e a nova raiz
-sempre nasce com exatamente 1 chave.
+Complexidade: O(b).
 
-### 5.4 Detalhe de implementação: chaves duplicadas
+### 6.3 Remoção — `removeItem(v, raiz)`
 
-A política do projeto é **rejeitar duplicatas**. Em `efetuaInsercao`:
+A implementação atual é **didática por reconstrução**:
 
-```c
-if (chave == (*paginaAtual)->chaves[i - 1]) {
-    fprintf(stderr, "Erro: chave %d ja inserida.\n", chave);
-    *promoveu = 0;
-    return;
-}
+```
+1. Verifique se v existe (busca normal).
+2. Colete todas as chaves da árvore em um vetor.
+3. Esvazie a árvore.
+4. Reinsira tudo, EXCETO v.
 ```
 
-Se preferir aceitar duplicatas (útil para índices secundários, por
-exemplo), basta remover essa verificação — o algoritmo de cisão
-continua válido.
+Complexidade: O(n·b), onde n = número de chaves. Bem mais cara que o
+teórico O(b), mas **simples de entender e provadamente correta** — o
+que vale ouro em contexto didático. Para "produção", o algoritmo
+in-place clássico é mais elaborado (lida com 3 casos diferentes
+dependendo de onde a chave aparece na árvore).
+
+### 6.4 Patrícia-sort — `sort(raiz)`
+
+Faz uma travessia em pré-ordem que imprime apenas folhas lógicas
+(back-edges). Como bit-0 está na esquerda e bit-1 na direita em todo
+nível, a sequência das folhas em pré-ordem **já é a sequência
+ordenada**. Não há comparação tradicional envolvida: é a Patrícia que
+implicitamente ordena pela representação binária.
+
+```
+A(00001) C(00011) E(00101) H(01000) I(01001) N(01110) R(10010) S(10011)
+```
+
+Complexidade: O(n).
 
 ---
 
-## 6. Remoção
-
-A remoção é **significativamente mais complexa** que a inserção,
-porque envolve dois cenários distintos e três estratégias de reparo:
-
-### 6.1 Os dois cenários
-
-| Cenário                        | Estratégia                                        |
-| ------------------------------ | ------------------------------------------------- |
-| Chave em **folha**             | Remove direto. Pode causar underflow.             |
-| Chave em página **interna**    | Substitui pelo **antecessor** (`antecessor()`) — a maior chave da subárvore esquerda. Reduz o problema ao caso da folha. |
-
-### 6.2 As três estratégias de reparo (underflow)
-
-Quando uma página fica com menos de _t_ chaves, `reconstitui()` aplica
-uma destas opções, **nessa ordem de preferência**:
-
-#### (a) Redistribuição com irmão à direita
-
-Se o irmão à direita tem mais que _t_ chaves, "puxa" parte dele:
+## 7. Arquitetura do código
 
 ```
-   Antes:               Depois:
-       [P]                  [P']
-      /   \                /    \
-   [a]    [b,c,d]      [a,P]    [c,d]
-     ↑                      ↑
-   <t chaves            chave separadora
-                        do pai desceu;
-                        nova separadora P' subiu
+patricia_c/
+├── patricia.h    # interface pública: tipos + assinaturas + docs Doxygen
+├── patricia.c    # implementação comentada
+├── main.c        # programa interativo com menu
+├── Makefile      # build + variantes (debug, sanitize, bits8, bits32)
+└── README.md     # este documento
 ```
 
-#### (b) Redistribuição com irmão à esquerda
+### Convenções de visibilidade
 
-Análoga, mas espelhada.
-
-#### (c) Fusão (merge)
-
-Se nenhum irmão tem folga, a página é **fundida** com seu irmão
-adjacente, descendo a chave separadora do pai entre as duas:
-
-```
-   Antes:               Depois:
-       [P,Q]                [Q]
-      /  |  \              /   \
-   [a]  [b]  [c,d]     [a,P,b]  [c,d]
-     ↑    ↑
-   <t   <t
-```
-
-A fusão **reduz em 1 a quantidade de chaves do pai** — por isso o
-underflow pode subir de nível. Esse é o único caso em que a árvore
-pode **diminuir em altura**: quando a fusão ocorre nos filhos
-imediatos da raiz e a raiz fica com 0 chaves, ela é descartada.
-
-### 6.3 Fluxo das funções
-
-```
-remocao()
-    │
-    ├──► efetuaRemocao()             ← procura a chave
-    │       │
-    │       ├── (chave em folha)
-    │       │      └──► remoção direta + marca underflow
-    │       │
-    │       └── (chave em página interna)
-    │              └──► antecessor() ← desce pelo filho mais à direita
-    │                       └──► reconstitui() ← se underflow
-    │
-    └── (se a raiz ficou vazia, descarta) ← árvore diminui em altura
-```
-
-### 6.4 O papel do `antecessor()`
-
-Para entender por que precisamos do antecessor, considere:
-
-```
-        [4, 7]
-       /  |   \
-    [2]  [5,6] [8,9]
-```
-
-Removendo `4` (chave interna): não podemos simplesmente deletá-la
-porque seu lugar precisa ser ocupado por alguém para manter as
-relações de ordem com `[2]` e `[5,6]`. O antecessor de 4 é `2`
-(maior chave da subárvore esquerda) — substituímos e o problema vira
-"remover 2 da folha `[2]`", que pode ser tratado normalmente.
+- Funções marcadas `static` no `.c` são internas (não exportadas).
+- O cabeçalho `patricia.h` só expõe o que o usuário externo precisa.
+- O `main.c` interage com a árvore **apenas pela API pública** —
+  nunca acessa `Nodo` diretamente, exceto para mostrar `bit` em
+  resultados de busca.
 
 ---
 
-## 7. Busca
+## 8. Melhorias aplicadas em relação ao código de referência
 
-A busca é diretamente análoga à busca binária, generalizada para
-múltiplas chaves por nó:
+A versão de referência (fornecida no ZIP) já era de boa qualidade —
+compilava limpa e passava em sanitizers. As melhorias aplicadas foram
+de **documentação e infraestrutura**, não de correção de bugs:
 
-```c
-TAB *busca(TAB *raiz, int chave) {
-    if (!raiz) return NULL;
+### 8.1 Documentação
 
-    int i = 1;
-    while (i < raiz->n_chaves && chave > raiz->chaves[i - 1])
-        i++;
+- **Comentários Doxygen** em todas as funções públicas do `patricia.h`,
+  com `@brief`, `@param`, `@return` e exemplos onde apropriado.
+- **Comentários didáticos** ao longo do `patricia.c` explicando cada
+  parte do algoritmo: o papel do sentinela, como reconhecer
+  back-edges, o protocolo recursivo da inserção, o porquê da
+  remoção por reconstrução.
+- **Estrutura em blocos** com cabeçalhos visuais separando
+  "construção/destruição", "operações principais", "travessias",
+  "utilidades".
 
-    if (chave == raiz->chaves[i - 1])
-        return raiz;                              // achou aqui
+### 8.2 Makefile robusto
 
-    if (chave < raiz->chaves[i - 1])
-        return busca(raiz->filhos[i - 1], chave); // desce à esquerda
-    else
-        return busca(raiz->filhos[i], chave);     // desce à direita
-}
-```
+O Makefile original cobria apenas `all` e `clean`. Adicionei:
 
-Como cada nível elimina uma página inteira, a busca é **O(log_t n)**
-no pior caso.
+- `make run` — compila e executa.
+- `make debug` — build com `-g -O0` para usar em `gdb`.
+- `make sanitize` — build com AddressSanitizer + UBSanitizer.
+- `make bits8`, `make bits32` — atalhos para diferentes larguras.
+- `-Wpedantic` adicionado às flags padrão (era só `-Wall -Wextra`).
 
-> **Limitação atual:** `busca()` retorna apenas o **ponteiro para a
-> página**, não a posição da chave dentro dela. Para acessar dados
-> associados a chaves (em uma implementação real de índice), seria
-> necessário ou devolver a posição também, ou usar uma estrutura
-> `{chave, valor}` em vez de `int`.
+### 8.3 Pequenos refinamentos
 
----
+- Inserção do primeiro elemento numa árvore vazia: a versão original
+  tinha um *fall-through* potencial quando `primeiroBitDiferente`
+  retornava `-1` na comparação com o sentinela. Adicionei tratamento
+  explícito para esse caso, com comentário, para deixar o caminho
+  óbvio mesmo que `itemValido` já garantisse que não cairia ali.
+- Variáveis locais movidas para o menor escopo possível (estilo C99/C11).
+- Documentação explícita da invariante "bit cresce ao descer", que
+  é a chave para entender o código todo.
 
-## 8. Impressão
+### 8.4 Verificação
 
-`imprimir()` faz uma travessia **in-order** adaptada para nós de
-múltiplas chaves: para cada par `(filho_esquerdo, chave)` imprime
-primeiro o filho, depois a chave; ao final, imprime o último filho
-(à direita da última chave). A indentação por `\t` faz a profundidade
-ficar visível na saída textual.
-
-Para a árvore final do `main.c`:
-
-```
-        2           ← folha (altura 2)
-        4           ← folha (altura 2)
-    5               ← raiz  (altura 1)
-        6           ← folha
-        7           ← folha
-        9           ← folha
-```
-
-Lendo a impressão como traversal in-order, a sequência das chaves
-aparece em ordem crescente — uma verificação rápida de que a árvore
-está válida.
+- Compila limpo com `-Wall -Wextra -Wpedantic -std=c11`.
+- Passa em AddressSanitizer + UBSanitizer com `make sanitize`,
+  exercitando insere/busca/remove/imprime/sort em sequência.
+- A saída para o exemplo da aula (`A,S,E,R,C,H,I,N`) é
+  **byte-a-byte idêntica** à da versão de referência, exceto por:
+  - a legenda da impressão menciona explicitamente "(back-edge)"
+    para deixar a terminologia clara;
+  - uma linha em branco extra ao final, para separação visual.
 
 ---
 
-## 9. Complexidade
+## 9. Comparação com a variante "híbrida"
 
-| Operação    | Caso médio    | Pior caso     |
-| ----------- | ------------- | ------------- |
-| Busca       | O(log_t _n_)  | O(log_t _n_)  |
-| Inserção    | O(log_t _n_)  | O(log_t _n_)  |
-| Remoção     | O(log_t _n_)  | O(log_t _n_)  |
+Se você já viu uma Patrícia implementada com **dois tipos de nó**
+(internos com `bit >= 0` e folhas com `bit = -1`), essa é a chamada
+"variante híbrida" — comum em projetos didáticos. As principais
+diferenças:
 
-Onde _n_ é o total de chaves na árvore e _t_ é a ordem. Para _t_ = 2
-e 1 milhão de chaves: a árvore tem altura ≈ 10.
+| | Variante híbrida | Variante clássica (esta) |
+|---|---|---|
+| Tipos de nó | 2 (interno + folha) | 1 (todos iguais) |
+| Identificar folha | Campo `bit == -1` | Back-edge: `filho.bit <= pai.bit` |
+| Raiz | Ponteiro que pode mudar | Sentinela fixo (`esq` é a raiz "real") |
+| Memória | `n + (n-1)` nós | `n + 1` nós (sentinela) |
+| Inserção 1ª chave | Caso especial óbvio | Casa naturalmente com o sentinela |
+| Tradição | Projetos didáticos | Sedgewick, Knuth, kernel Linux |
+
+A clássica é mais eficiente em memória (~metade dos nós) e mais
+elegante (caso vazio é trivialmente representado), mas a híbrida é
+mais fácil de visualizar inicialmente.
 
 ---
 
-## 10. Diferenças em relação à versão original
+## 10. Complexidade
 
-A reescrita preserva o **algoritmo** e a **interface pública** —
-qualquer código existente que use `insercao`, `remocao`, `busca` e
-`imprimir` continua funcionando inalterado.
+| Operação    | Complexidade | Observação                         |
+| ----------- | ------------ | ---------------------------------- |
+| Busca       | O(b)         | b = `PATRICIA_BITS`                |
+| Inserção    | O(b)         |                                    |
+| Remoção     | O(n·b)       | Pela reconstrução didática         |
+| Travessia   | O(n)         | Visita cada folha uma vez          |
+| Sort        | O(n)         | Pré-ordem das folhas               |
+| Liberação   | O(n)         | Visita cada nó uma vez             |
 
-As correções e melhorias aplicadas:
-
-### 10.1 Bugs corrigidos
-
-| # | Bug                                                      | Onde                        | Impacto                          |
-| - | -------------------------------------------------------- | --------------------------- | -------------------------------- |
-| 1 | `int* valida` em vez de `int valida` (ponteiro não inicializado) | `insercao()`, `remocao()` | **Comportamento indefinido**; o compilador emite warning `-Wincompatible-pointer-types`. O código funcionava por sorte porque o lixo da pilha calhava de apontar para um endereço gravável. |
-| 2 | `sizeof(TAB)` em vez de `sizeof(TAB*)` ao alocar `filhos` | `novaPagina()`              | Desperdício de ~3× memória por página (sem falha funcional). |
-| 3 | Ausência de função para liberar a árvore                 | global                      | Vazamento de memória: 616 bytes em 11 alocações no exemplo do `main.c` (confirmado com AddressSanitizer). |
-| 4 | `#include "TAB.c"` em `main.c`                           | `main.c`                    | Anti-padrão: impede compilação separada, pode causar erros de redefinição em projetos maiores. |
-| 5 | Indentação enganosa em `main.c` (warning `-Wmisleading-indentation`) | `main.c`             | Cosmético, mas confuso ao ler.   |
-| 6 | Mensagens de erro em `stdout`                            | `efetuaInsercao()`, `efetuaRemocao()` | Devem ir para `stderr` para não poluir saída de dados. |
-
-### 10.2 Melhorias didáticas
-
-- **Comentários Doxygen** em todas as funções do `TAB.h`.
-- **Comentários explicativos** ao longo do `TAB.c` descrevendo cada
-  bloco lógico do algoritmo.
-- **Nomes de variáveis mais expressivos**:
-  - `main` → `paginaAtual` / `raiz` (evita conflito com `main()`)
-  - `iNP` → `inserePagina`
-  - `nI` → `chavePromov`
-  - `valida` → `promoveu` / `underflow` (significado claro em cada contexto)
-  - `nAP` → `posicaoNaoEncontrada`
-- **Estilo de código consistente**: indentação 4 espaços, chaves K&R,
-  declarações no menor escopo possível (C99/C11).
-- **Makefile** com alvos `all`, `run`, `debug`, `clean`.
-
-### 10.3 Verificação
-
-A versão melhorada foi validada com:
-
-```bash
-# Compilação limpa (sem warnings)
-gcc -Wall -Wextra -Wpedantic -std=c11 -o arvoreb main.c TAB.c
-
-# Sem comportamento indefinido nem vazamento
-gcc -fsanitize=address -fsanitize=undefined -g -O0 -o arvoreb_san main.c TAB.c
-./arvoreb_san     # exit code 0, sem mensagens do sanitizer
-```
-
-A saída do programa é **idêntica** à da versão original para a
-sequência de teste do `main.c`.
+Onde `n` é o número de chaves e `b` é o número de bits da chave.
 
 ---
 
 ## 11. Possíveis extensões (sugestões didáticas)
 
-1. **Entrada por arquivo ou stdin** — substituir o vetor fixo de
-   chaves do `main.c` por leitura, transformando o programa em uma
-   CLI utilizável.
-2. **Suporte a chave-valor** — generalizar `int chaves[]` para uma
-   `struct { int chave; T valor; }`, ainda com `int` como chave para
-   ordenação.
-3. **Variante B+** — em árvores B+, apenas as folhas guardam os dados
-   reais e as folhas formam uma lista ligada — exatamente o que o
-   InnoDB do MySQL faz em seus índices. Boa extensão para conectar
-   com o conteúdo de Banco de Dados.
-4. **Visualização** — exportar a árvore em formato DOT (Graphviz) ou
-   JSON para renderizar com ferramentas externas.
-5. **Generalizar a ordem** — atualmente todas as funções recebem
-   `ordem` como parâmetro; armazenar a ordem na própria estrutura
-   (em um tipo "ArvoreB" envolvendo o ponteiro raiz) simplifica a API.
+1. **Remoção in-place** — substitua a remoção por reconstrução pelo
+   algoritmo clássico in-place O(b). Bom exercício para entender os
+   três casos de remoção.
+2. **Chaves variáveis (strings)** — generalize para chaves de tamanho
+   variável (strings); cada bit é um bit do byte da posição corrente.
+   Base para roteamento IP.
+3. **Busca por prefixo** — adicione `buscaPrefixo(t, prefixo, n_bits)`
+   que retorna todas as chaves que começam com os `n_bits` primeiros
+   bits de `prefixo`. Aplicação direta: longest-prefix match em
+   roteadores.
+4. **Visualização gráfica** — gere saída em formato DOT (Graphviz)
+   para renderizar a árvore como imagem; destaque back-edges com
+   setas pontilhadas.
+5. **Comparativo com ABB** — exercício: insira a mesma sequência de
+   1000 chaves ordenadas em uma Patrícia e em uma ABB. Compare altura
+   e número de comparações em buscas posteriores. A Patrícia mantém
+   altura limitada por `b`; a ABB degenera para uma lista de altura
+   1000.
 
 ---
 
 ## Licença
 
-Mantida do projeto original — ver `LICENSE`.
+A versão original deste código segue a licença do projeto-base
+(Patrick Araújo) — ver `LICENSE` se incluído.
